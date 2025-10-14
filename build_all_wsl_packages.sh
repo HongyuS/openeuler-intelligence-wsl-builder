@@ -63,12 +63,22 @@ for variant in "${VARIANTS[@]}"; do
 
         log_step "[$CURRENT/$TOTAL] 构建 ${variant} ${arch}..."
 
-        if "$SCRIPT_DIR/build_wsl_package.sh" --variant "$variant" --arch "$arch" --output-dir "$OUTPUT_DIR"; then
+        # 捕获构建输出和退出码
+        BUILD_LOG=$(mktemp)
+        BUILD_ERROR=0
+
+        if ! "$SCRIPT_DIR/build_wsl_package.sh" --variant "$variant" --arch "$arch" --output-dir "$OUTPUT_DIR" 2>&1 | tee "$BUILD_LOG"; then
+            BUILD_ERROR=$?
+        fi
+
+        if [ $BUILD_ERROR -eq 0 ]; then
             log_info "✅ ${variant} ${arch} 构建成功"
         else
-            log_info "❌ ${variant} ${arch} 构建失败"
+            log_info "❌ ${variant} ${arch} 构建失败 (退出码: $BUILD_ERROR)"
             FAILED=$((FAILED + 1))
         fi
+
+        rm -f "$BUILD_LOG"
 
         echo ""
     done

@@ -117,33 +117,121 @@ extract_filesystem() {
         return 1
     fi
 
+    log_info "QCOW2 文件路径: $qcow2_path"
+    log_info "QCOW2 文件大小: $(du -h "$qcow2_path" | cut -f1)"
+
     # 创建临时目录
     mkdir -p "$temp_dir/rootfs"
 
     log_info "从 QCOW2 镜像提取文件系统..."
 
     # 使用 guestfish 获取根目录下的所有条目
+    log_info "检查 QCOW2 镜像内容..."
     local entries
-    entries=$(guestfish --ro -a "$qcow2_path" -i ls / 2>/dev/null || echo "")
+    local guestfish_output
+    local guestfish_error
+
+    guestfish_output=$(mktemp)
+    guestfish_error=$(mktemp)
+
+    if ! guestfish --ro -a "$qcow2_path" -i ls / >"$guestfish_output" 2>"$guestfish_error"; then
+        log_error "guestfish 命令失败"
+        log_error "错误输出:"
+        cat "$guestfish_error" | while IFS= read -r line; do
+            log_error "  $line"
+        done
+        rm -f "$guestfish_output" "$guestfish_error"
+        return 1
+    fi
+
+    entries=$(cat "$guestfish_output")
+
+    if [ -n "$(cat "$guestfish_error")" ]; then
+        log_warn "guestfish 警告信息:"
+        cat "$guestfish_error" | while IFS= read -r line; do
+            log_warn "  $line"
+        done
+    fi
+
+    rm -f "$guestfish_output" "$guestfish_error"
 
     if [ -z "$entries" ]; then
         log_error "无法列出 QCOW2 镜像中的文件"
         return 1
     fi
 
+    log_info "镜像根目录包含以下内容:"
+    echo "$entries" | while IFS= read -r entry; do
+        log_info "  $entry"
+    done
+
     log_info "开始提取文件系统 (这可能需要几分钟)..."
 
     # 使用 virt-tar-out 提取，但先提取到临时 tar 然后解压
     local temp_tar="$temp_dir/temp.tar"
+    local virt_output
+    local virt_error
 
-    if ! virt-tar-out -a "$qcow2_path" / "$temp_tar" 2>&1 | grep -v "^$"; then
-        log_error "提取文件系统失败"
+    virt_output=$(mktemp)
+    virt_error=$(mktemp)
+
+    log_info "执行命令: virt-tar-out -a \"$qcow2_path\" / \"$temp_tar\""
+
+    if ! virt-tar-out -a "$qcow2_path" / "$temp_tar" >"$virt_output" 2>"$virt_error"; then
+        log_error "virt-tar-out 命令失败 (退出码: $?)"
+
+        if [ -s "$virt_error" ]; then
+            log_error "错误输出:"
+            cat "$virt_error" | while IFS= read -r line; do
+                log_error "  $line"
+            done
+        fi
+
+        if [ -s "$virt_output" ]; then
+            log_info "标准输出:"
+            cat "$virt_output" | while IFS= read -r line; do
+                log_info "  $line"
+            done
+        fi
+
+        rm -f "$virt_output" "$virt_error"
         return 1
     fi
+
+    # 显示任何输出信息
+    if [ -s "$virt_output" ]; then
+        log_info "virt-tar-out 输出:"
+        cat "$virt_output" | while IFS= read -r line; do
+            log_info "  $line"
+        done
+    fi
+
+    if [ -s "$virt_error" ]; then
+        log_warn "virt-tar-out 警告:"
+        cat "$virt_error" | while IFS= read -r line; do
+            log_warn "  $line"
+        done
+    fi
+
+    rm -f "$virt_output" "$virt_error"
+
+    # 检查临时 tar 文件是否创建成功
+    if [ ! -f "$temp_tar" ]; then
+        log_error "临时 tar 文件未创建: $temp_tar"
+        return 1
+    fi
+
+    log_info "临时 tar 文件创建成功，大小: $(du -h "$temp_tar" | cut -f1)"
 
     log_info "解压并过滤文件系统..."
 
     # 解压时排除不需要的目录
+    local tar_output
+    local tar_error
+
+    tar_output=$(mktemp)
+    tar_error=$(mktemp)
+
     if ! tar -xf "$temp_tar" -C "$temp_dir/rootfs" \
         --exclude='./sys' --exclude='./sys/*' \
         --exclude='./run' --exclude='./run/*' \
@@ -154,10 +242,39 @@ extract_filesystem() {
         --exclude='./afs' --exclude='./afs/*' \
         --exclude='./root/.cache' --exclude='./root/.cache/*' \
         --exclude='./var/cache' --exclude='./var/cache/*' \
-        --exclude='./var/log' --exclude='./var/log/*' 2>&1; then
-        log_error "解压文件系统失败"
+        --exclude='./var/log' --exclude='./var/log/*' >"$tar_output" 2>"$tar_error"; then
+        log_error "tar 解压失败 (退出码: $?)"
+
+        if [ -s "$tar_error" ]; then
+            log_error "错误输出:"
+            cat "$tar_error" | while IFS= read -r line; do
+                log_error "  $line"
+            done
+        fi
+
+        rm -f "$tar_output" "$tar_error"
         return 1
     fi
+
+    if [ -s "$tar_error" ]; then
+        log_warn "tar 警告信息:"
+        cat "$tar_error" | while IFS= read -r line; do
+            log_warn "  $line"
+        done
+    fi
+
+    rm -f "$tar_output" "$tar_error"
+
+    # 检查 rootfs 是否有内容
+    local rootfs_count
+    rootfs_count=$(find "$temp_dir/rootfs" -mindepth 1 -maxdepth 1 | wc -l)
+
+    if [ "$rootfs_count" -eq 0 ]; then
+        log_error "rootfs 目录为空"
+        return 1
+    fi
+
+    log_info "rootfs 包含 $rootfs_count 个顶级目录/文件"
 
     # 删除临时 tar 文件
     rm -f "$temp_tar"
