@@ -17,6 +17,7 @@
 
 - **系统**: Fedora Linux (推荐) 或其他支持 libguestfs 的 Linux 发行版
 - **依赖**: libguestfs-tools
+- **权限**: Root 权限（构建脚本会自动使用 sudo）
 
 ```bash
 # Fedora / RHEL / CentOS
@@ -25,6 +26,8 @@ sudo dnf install libguestfs-tools
 # Ubuntu / Debian
 sudo apt install libguestfs-tools
 ```
+
+> **注意**: 构建脚本需要 root 权限来操作提取的文件系统。如果不是以 root 运行，脚本会自动使用 sudo 重新执行。
 
 ### 构建 WSL 包
 
@@ -66,14 +69,14 @@ make help                   # 显示帮助
 ## 使用脚本
 
 ```bash
-# 构建单个 WSL 包
+# 构建单个 WSL 包 (脚本会自动使用 sudo)
 ./build_wsl_package.sh --variant shell --arch x86_64
 ./build_wsl_package.sh --variant web --arch aarch64
 
-# 批量构建所有 WSL 包
+# 批量构建所有 WSL 包 (脚本会自动使用 sudo)
 ./build_all_wsl_packages.sh
 
-# 验证 WSL 包
+# 验证 WSL 包 (不需要 root 权限)
 ./verify_wsl_package.sh openEuler-Intelligence-Shell.x86_64.wsl
 ```
 

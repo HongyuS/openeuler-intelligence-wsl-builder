@@ -1,9 +1,17 @@
 #!/bin/bash
 
 # 批量构建所有 WSL 包的脚本
+# 需要 root 权限运行
 # 用法: ./build_all_wsl_packages.sh [--output-dir DIR]
 
 set -euo pipefail
+
+# 检查是否以 root 权限运行，如果不是则使用 sudo 重新执行
+if [ "$EUID" -ne 0 ]; then
+    echo "此脚本需要 root 权限来操作文件系统"
+    echo "使用 sudo 重新执行脚本..."
+    exec sudo -E "$0" "$@"
+fi
 
 # 颜色输出
 GREEN='\033[0;32m'

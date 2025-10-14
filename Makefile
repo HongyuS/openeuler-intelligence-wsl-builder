@@ -22,6 +22,7 @@ help:
 	@echo "环境要求:"
 	@echo "  - Fedora 系统（推荐）或其他 Linux"
 	@echo "  - libguestfs-tools (运行 'make check-deps' 检查)"
+	@echo "  - Root 权限 (构建脚本会自动使用 sudo)"
 
 check-deps:
 	@echo "检查依赖..."

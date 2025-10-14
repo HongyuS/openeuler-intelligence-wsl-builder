@@ -3,6 +3,7 @@
 # 脚本用于从 QCOW2 镜像构建 WSL 发行版包
 # 适用于 Fedora 系统
 # 需要安装 libguestfs-tools: dnf install libguestfs-tools
+# 需要 root 权限运行
 #
 # 用法: ./build_wsl_package.sh [--arch ARCH] [--variant VARIANT] [--output-dir DIR]
 #   --arch ARCH        指定架构 (x86_64 或 aarch64, 默认: x86_64)
@@ -12,6 +13,13 @@
 #   --help, -h         显示帮助信息
 
 set -euo pipefail
+
+# 检查是否以 root 权限运行，如果不是则使用 sudo 重新执行
+if [ "$EUID" -ne 0 ]; then
+    echo "此脚本需要 root 权限来操作文件系统"
+    echo "使用 sudo 重新执行脚本..."
+    exec sudo -E "$0" "$@"
+fi
 
 # 颜色输出
 RED='\033[0;31m'
@@ -60,10 +68,15 @@ show_help() {
 环境要求:
   - Fedora 系统
   - 已安装 libguestfs-tools (dnf install libguestfs-tools)
+  - Root 权限 (脚本会自动使用 sudo)
 
 输出文件:
   - openEuler-Intelligence-{variant}.{arch}.wsl
   - openEuler-Intelligence-{variant}.{arch}.wsl.sha256
+
+注意:
+  此脚本需要 root 权限来操作提取的文件系统。
+  如果不是以 root 运行，脚本会自动使用 sudo 重新执行。
 
 EOF
 }
