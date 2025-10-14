@@ -54,6 +54,8 @@ clean:
 	@rm -vf openEuler-Intelligence-*.wsl
 	@rm -vf openEuler-Intelligence-*.wsl.sha256
 	@rm -rf wsl_packages/
+	@rm -rf wsl_temp*/
+	@rm -f build_wsl_*.log
 	@echo "清理完成"
 
 verify-wsl:

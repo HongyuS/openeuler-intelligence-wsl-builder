@@ -292,10 +292,12 @@ extract_filesystem() {
     tar_output=$(mktemp)
     tar_error=$(mktemp)
 
-    # 使用 --preserve-permissions 和 --same-owner 保留原始权限和所有者
-    if ! tar -xf "$temp_tar" -C "$temp_dir/rootfs" \
-        --preserve-permissions \
-        --same-owner \
+    # 解压文件系统 - 使用宽容的错误处理
+    # 使用 --warning=no-unknown-keyword 忽略tar的一些警告
+    # 不使用 --same-owner 避免权限问题,因为在WSL中会重新设置所有权
+    tar -xf "$temp_tar" -C "$temp_dir/rootfs" \
+        --numeric-owner \
+        --warning=no-unknown-keyword \
         --exclude='./sys' --exclude='./sys/*' \
         --exclude='./run' --exclude='./run/*' \
         --exclude='./proc' --exclude='./proc/*' \
@@ -305,7 +307,13 @@ extract_filesystem() {
         --exclude='./afs' --exclude='./afs/*' \
         --exclude='./root/.cache' --exclude='./root/.cache/*' \
         --exclude='./var/cache' --exclude='./var/cache/*' \
-        --exclude='./var/log' --exclude='./var/log/*' >"$tar_output" 2>"$tar_error"; then
+        --exclude='./var/log' --exclude='./var/log/*' >"$tar_output" 2>"$tar_error"
+
+    local tar_exit_code=$?
+
+    # tar 退出码 0=成功, 1=文件发生变化但成功, 2=致命错误
+    # 我们接受 0 和 1
+    if [ $tar_exit_code -gt 1 ]; then
         log_error "tar 解压失败"
 
         if [ -s "$tar_error" ]; then
