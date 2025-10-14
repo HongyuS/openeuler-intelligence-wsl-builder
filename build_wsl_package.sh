@@ -28,21 +28,61 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# 日志函数
+# 日志文件
+LOG_FILE=""
+
+# 初始化日志文件
+init_log_file() {
+    local script_dir=$1
+    local timestamp
+    timestamp=$(date +%Y%m%d_%H%M%S)
+    LOG_FILE="$script_dir/build_wsl_${timestamp}.log"
+
+    # 创建日志文件并写入头部信息
+    {
+        echo "=========================================="
+        echo "WSL 包构建日志"
+        echo "开始时间: $(date '+%Y-%m-%d %H:%M:%S')"
+        echo "=========================================="
+        echo ""
+    } >"$LOG_FILE"
+
+    echo -e "${GREEN}[INFO]${NC} 日志文件: $LOG_FILE"
+}
+
+# 日志函数 - 同时输出到终端和日志文件
 log_info() {
     echo -e "${GREEN}[INFO]${NC} $1"
+    [ -n "$LOG_FILE" ] && echo "[INFO] $(date '+%H:%M:%S') $1" >>"$LOG_FILE"
 }
 
 log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
+    [ -n "$LOG_FILE" ] && echo "[ERROR] $(date '+%H:%M:%S') $1" >>"$LOG_FILE"
 }
 
 log_warn() {
     echo -e "${YELLOW}[WARN]${NC} $1"
+    [ -n "$LOG_FILE" ] && echo "[WARN] $(date '+%H:%M:%S') $1" >>"$LOG_FILE"
 }
 
 log_step() {
     echo -e "${BLUE}[STEP]${NC} $1"
+    [ -n "$LOG_FILE" ] && echo "[STEP] $(date '+%H:%M:%S') $1" >>"$LOG_FILE"
+}
+
+# 仅写入日志文件的函数
+log_detail() {
+    [ -n "$LOG_FILE" ] && echo "[DETAIL] $(date '+%H:%M:%S') $1" >>"$LOG_FILE"
+}
+
+# 将命令输出写入日志文件
+log_command_output() {
+    if [ -n "$LOG_FILE" ]; then
+        while IFS= read -r line; do
+            echo "  $line" >>"$LOG_FILE"
+        done
+    fi
 }
 
 # 显示帮助信息
@@ -105,7 +145,7 @@ check_dependencies() {
 cleanup_temp() {
     local temp_dir=$1
     if [ -d "$temp_dir" ]; then
-        log_info "清理临时目录: $temp_dir"
+        log_detail "清理临时目录: $temp_dir"
         rm -rf "$temp_dir"
     fi
 }
@@ -130,16 +170,17 @@ extract_filesystem() {
         return 1
     fi
 
-    log_info "QCOW2 文件路径: $qcow2_path"
-    log_info "QCOW2 文件大小: $(du -h "$qcow2_path" | cut -f1)"
+    local qcow2_size
+    qcow2_size=$(du -h "$qcow2_path" | cut -f1)
+    log_info "QCOW2 文件大小: $qcow2_size"
+    log_detail "QCOW2 文件路径: $qcow2_path"
 
     # 创建临时目录
     mkdir -p "$temp_dir/rootfs"
 
-    log_info "从 QCOW2 镜像提取文件系统..."
+    log_info "检查镜像内容..."
 
     # 使用 guestfish 获取根目录下的所有条目
-    log_info "检查 QCOW2 镜像内容..."
     local entries
     local guestfish_output
     local guestfish_error
@@ -147,12 +188,17 @@ extract_filesystem() {
     guestfish_output=$(mktemp)
     guestfish_error=$(mktemp)
 
+    log_detail "执行命令: guestfish --ro -a \"$qcow2_path\" -i ls /"
+
     if ! guestfish --ro -a "$qcow2_path" -i ls / >"$guestfish_output" 2>"$guestfish_error"; then
         log_error "guestfish 命令失败"
-        log_error "错误输出:"
-        cat "$guestfish_error" | while IFS= read -r line; do
-            log_error "  $line"
-        done
+        if [ -s "$guestfish_error" ]; then
+            log_error "详细错误信息请查看日志文件"
+            [ -n "$LOG_FILE" ] && {
+                echo "[ERROR] guestfish 错误输出:" >>"$LOG_FILE"
+                cat "$guestfish_error" >>"$LOG_FILE"
+            }
+        fi
         rm -f "$guestfish_output" "$guestfish_error"
         return 1
     fi
@@ -160,10 +206,11 @@ extract_filesystem() {
     entries=$(cat "$guestfish_output")
 
     if [ -n "$(cat "$guestfish_error")" ]; then
-        log_warn "guestfish 警告信息:"
-        cat "$guestfish_error" | while IFS= read -r line; do
-            log_warn "  $line"
-        done
+        log_detail "guestfish 警告信息 (详见日志文件)"
+        [ -n "$LOG_FILE" ] && {
+            echo "[WARN] guestfish 警告:" >>"$LOG_FILE"
+            cat "$guestfish_error" >>"$LOG_FILE"
+        }
     fi
 
     rm -f "$guestfish_output" "$guestfish_error"
@@ -173,12 +220,13 @@ extract_filesystem() {
         return 1
     fi
 
-    log_info "镜像根目录包含以下内容:"
+    # 将镜像内容写入日志
+    log_detail "镜像根目录内容:"
     echo "$entries" | while IFS= read -r entry; do
-        log_info "  $entry"
+        log_detail "  $entry"
     done
 
-    log_info "开始提取文件系统 (这可能需要几分钟)..."
+    log_info "提取文件系统 (这可能需要几分钟)..."
 
     # 使用 virt-tar-out 提取，但先提取到临时 tar 然后解压
     local temp_tar="$temp_dir/temp.tar"
@@ -188,42 +236,38 @@ extract_filesystem() {
     virt_output=$(mktemp)
     virt_error=$(mktemp)
 
-    log_info "执行命令: virt-tar-out -a \"$qcow2_path\" / \"$temp_tar\""
+    log_detail "执行命令: virt-tar-out -a \"$qcow2_path\" / \"$temp_tar\""
 
     if ! virt-tar-out -a "$qcow2_path" / "$temp_tar" >"$virt_output" 2>"$virt_error"; then
-        log_error "virt-tar-out 命令失败 (退出码: $?)"
+        log_error "virt-tar-out 命令失败"
 
         if [ -s "$virt_error" ]; then
-            log_error "错误输出:"
-            cat "$virt_error" | while IFS= read -r line; do
-                log_error "  $line"
-            done
-        fi
-
-        if [ -s "$virt_output" ]; then
-            log_info "标准输出:"
-            cat "$virt_output" | while IFS= read -r line; do
-                log_info "  $line"
-            done
+            log_error "详细错误信息请查看日志文件"
+            [ -n "$LOG_FILE" ] && {
+                echo "[ERROR] virt-tar-out 错误输出:" >>"$LOG_FILE"
+                cat "$virt_error" >>"$LOG_FILE"
+            }
         fi
 
         rm -f "$virt_output" "$virt_error"
         return 1
     fi
 
-    # 显示任何输出信息
+    # 将命令输出写入日志文件
     if [ -s "$virt_output" ]; then
-        log_info "virt-tar-out 输出:"
-        cat "$virt_output" | while IFS= read -r line; do
-            log_info "  $line"
-        done
+        log_detail "virt-tar-out 标准输出 (详见日志文件)"
+        [ -n "$LOG_FILE" ] && {
+            echo "[DETAIL] virt-tar-out 输出:" >>"$LOG_FILE"
+            cat "$virt_output" >>"$LOG_FILE"
+        }
     fi
 
     if [ -s "$virt_error" ]; then
-        log_warn "virt-tar-out 警告:"
-        cat "$virt_error" | while IFS= read -r line; do
-            log_warn "  $line"
-        done
+        log_detail "virt-tar-out 警告信息 (详见日志文件)"
+        [ -n "$LOG_FILE" ] && {
+            echo "[WARN] virt-tar-out 警告:" >>"$LOG_FILE"
+            cat "$virt_error" >>"$LOG_FILE"
+        }
     fi
 
     rm -f "$virt_output" "$virt_error"
@@ -234,9 +278,12 @@ extract_filesystem() {
         return 1
     fi
 
-    log_info "临时 tar 文件创建成功，大小: $(du -h "$temp_tar" | cut -f1)"
+    local temp_tar_size
+    temp_tar_size=$(du -h "$temp_tar" | cut -f1)
+    log_info "提取完成，临时文件大小: $temp_tar_size"
 
-    log_info "解压并过滤文件系统..."
+    log_info "解压文件系统..."
+    log_detail "解压用户: $(whoami) (UID: $(id -u))"
 
     # 解压时排除不需要的目录
     local tar_output
@@ -245,7 +292,10 @@ extract_filesystem() {
     tar_output=$(mktemp)
     tar_error=$(mktemp)
 
+    # 使用 --preserve-permissions 和 --same-owner 保留原始权限和所有者
     if ! tar -xf "$temp_tar" -C "$temp_dir/rootfs" \
+        --preserve-permissions \
+        --same-owner \
         --exclude='./sys' --exclude='./sys/*' \
         --exclude='./run' --exclude='./run/*' \
         --exclude='./proc' --exclude='./proc/*' \
@@ -256,13 +306,14 @@ extract_filesystem() {
         --exclude='./root/.cache' --exclude='./root/.cache/*' \
         --exclude='./var/cache' --exclude='./var/cache/*' \
         --exclude='./var/log' --exclude='./var/log/*' >"$tar_output" 2>"$tar_error"; then
-        log_error "tar 解压失败 (退出码: $?)"
+        log_error "tar 解压失败"
 
         if [ -s "$tar_error" ]; then
-            log_error "错误输出:"
-            cat "$tar_error" | while IFS= read -r line; do
-                log_error "  $line"
-            done
+            log_error "详细错误信息请查看日志文件"
+            [ -n "$LOG_FILE" ] && {
+                echo "[ERROR] tar 错误输出:" >>"$LOG_FILE"
+                cat "$tar_error" >>"$LOG_FILE"
+            }
         fi
 
         rm -f "$tar_output" "$tar_error"
@@ -270,10 +321,11 @@ extract_filesystem() {
     fi
 
     if [ -s "$tar_error" ]; then
-        log_warn "tar 警告信息:"
-        cat "$tar_error" | while IFS= read -r line; do
-            log_warn "  $line"
-        done
+        log_detail "tar 警告信息 (详见日志文件)"
+        [ -n "$LOG_FILE" ] && {
+            echo "[WARN] tar 警告:" >>"$LOG_FILE"
+            cat "$tar_error" >>"$LOG_FILE"
+        }
     fi
 
     rm -f "$tar_output" "$tar_error"
@@ -287,12 +339,12 @@ extract_filesystem() {
         return 1
     fi
 
-    log_info "rootfs 包含 $rootfs_count 个顶级目录/文件"
+    log_info "解压完成，rootfs 包含 $rootfs_count 个顶级目录/文件"
 
     # 删除临时 tar 文件
     rm -f "$temp_tar"
 
-    log_info "文件系统提取完成"
+    log_info "文件系统提取完成 ✓"
     return 0
 }
 
@@ -311,11 +363,11 @@ configure_wsl_files() {
 
     # 复制 wsl.conf
     if [ -f "$script_dir/wsl/wsl.conf" ]; then
-        log_info "复制 wsl.conf..."
+        log_detail "复制 wsl.conf"
         cp "$script_dir/wsl/wsl.conf" "$rootfs/etc/wsl.conf"
         chmod 644 "$rootfs/etc/wsl.conf"
     else
-        log_warn "wsl.conf 不存在，创建默认配置..."
+        log_warn "wsl.conf 不存在，创建默认配置"
         cat >"$rootfs/etc/wsl.conf" <<'WSLEOF'
 [boot]
 systemd=true
@@ -330,7 +382,7 @@ WSLEOF
 
     # 复制 wsl-distribution.conf
     if [ -f "$script_dir/wsl/wsl-distribution.conf" ]; then
-        log_info "复制 wsl-distribution.conf..."
+        log_detail "复制 wsl-distribution.conf"
         cp "$script_dir/wsl/wsl-distribution.conf" "$rootfs/etc/wsl-distribution.conf"
 
         # 根据变体修改 defaultName
@@ -342,7 +394,7 @@ WSLEOF
 
         chmod 644 "$rootfs/etc/wsl-distribution.conf"
     else
-        log_warn "wsl-distribution.conf 不存在，创建默认配置..."
+        log_warn "wsl-distribution.conf 不存在，创建默认配置"
         cat >"$rootfs/etc/wsl-distribution.conf" <<DISTEOF
 [oobe]
 command = /etc/oobe.sh
@@ -360,20 +412,20 @@ DISTEOF
 
     # 复制 oobe.sh
     if [ -f "$script_dir/wsl/oobe.sh" ]; then
-        log_info "复制 oobe.sh..."
+        log_detail "复制 oobe.sh"
         cp "$script_dir/wsl/oobe.sh" "$rootfs/etc/oobe.sh"
         chmod 755 "$rootfs/etc/oobe.sh"
     else
-        log_warn "oobe.sh 不存在，跳过..."
+        log_warn "oobe.sh 不存在，跳过"
     fi
 
     # 复制图标文件
     if [ -f "$script_dir/wsl/openEuler.ico" ]; then
-        log_info "复制 openEuler 图标..."
+        log_detail "复制 openEuler 图标"
         cp "$script_dir/wsl/openEuler.ico" "$rootfs/usr/lib/wsl/openeuler.ico"
         chmod 644 "$rootfs/usr/lib/wsl/openeuler.ico"
     else
-        log_warn "openEuler.ico 不存在，跳过..."
+        log_warn "openEuler.ico 不存在，跳过"
     fi
 
     # 确保 root 用户存在于 /etc/passwd
@@ -386,13 +438,13 @@ DISTEOF
 
     # 删除 /etc/resolv.conf (WSL 会自动生成)
     if [ -f "$rootfs/etc/resolv.conf" ] || [ -L "$rootfs/etc/resolv.conf" ]; then
-        log_info "删除 /etc/resolv.conf (WSL 会自动生成)"
+        log_detail "删除 /etc/resolv.conf (WSL 会自动生成)"
         rm -f "$rootfs/etc/resolv.conf"
     fi
 
     # 清理密码哈希 (如果存在 /etc/shadow)
     if [ -f "$rootfs/etc/shadow" ]; then
-        log_info "清理密码哈希..."
+        log_detail "清理密码哈希"
         # 备份原文件
         cp "$rootfs/etc/shadow" "$rootfs/etc/shadow.bak"
         # 清空所有密码字段
@@ -401,7 +453,7 @@ DISTEOF
 
     # 禁用可能导致问题的 systemd 服务
     if [ "$variant" = "shell" ] || [ "$variant" = "web" ]; then
-        log_info "禁用可能导致问题的 systemd 服务..."
+        log_info "禁用不兼容的 systemd 服务..."
 
         local services_to_mask=(
             "systemd-resolved.service"
@@ -414,11 +466,14 @@ DISTEOF
             "systemd-tmpfiles-setup-dev.service"
         )
 
+        local masked_count=0
         for service in "${services_to_mask[@]}"; do
             local service_path="$rootfs/etc/systemd/system/$service"
             if [ ! -e "$service_path" ]; then
                 mkdir -p "$(dirname "$service_path")"
                 ln -sf /dev/null "$service_path" 2>/dev/null || true
+                ((masked_count++))
+                log_detail "禁用服务: $service"
             fi
         done
 
@@ -427,10 +482,14 @@ DISTEOF
         if [ ! -e "$tmp_mount" ]; then
             mkdir -p "$(dirname "$tmp_mount")"
             ln -sf /dev/null "$tmp_mount" 2>/dev/null || true
+            ((masked_count++))
+            log_detail "禁用挂载: tmp.mount"
         fi
+
+        log_info "已禁用 $masked_count 个服务/挂载"
     fi
 
-    log_info "WSL 配置完成"
+    log_info "WSL 配置完成 ✓"
 }
 
 # 创建 WSL tar 包
@@ -441,17 +500,18 @@ create_wsl_tar() {
 
     log_step "创建 WSL tar 包..."
 
-    log_info "打包文件系统..."
+    log_info "打包文件系统 (这可能需要几分钟)..."
+    log_detail "执行命令: tar --numeric-owner --absolute-names -c * | gzip --best"
 
     # 使用推荐的方式创建 tar 文件
-    if ! (cd "$rootfs" && tar --numeric-owner --absolute-names -c * | gzip --best >"$output_tar"); then
+    if ! (cd "$rootfs" && tar --numeric-owner --absolute-names -c * 2>&1 | tee -a "$LOG_FILE" | gzip --best >"$output_tar"); then
         log_error "创建 tar 包失败"
         return 1
     fi
 
     local size
     size=$(du -h "$output_tar" | cut -f1)
-    log_info "WSL tar 包创建完成，大小: $size"
+    log_info "打包完成，大小: $size ✓"
 
     return 0
 }
@@ -483,8 +543,13 @@ generate_checksum() {
 
     (cd "$dir" && sha256sum "$filename" >"$(basename "$checksum_file")")
 
-    log_info "校验和文件: $(basename "$checksum_file")"
-    cat "$checksum_file"
+    # 将校验和写入日志文件
+    if [ -n "$LOG_FILE" ]; then
+        echo "[INFO] 校验和:" >>"$LOG_FILE"
+        cat "$checksum_file" >>"$LOG_FILE"
+    fi
+
+    log_info "校验和生成完成 ✓"
 }
 
 # 主函数
@@ -522,6 +587,9 @@ main() {
     script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     qemu_dir="$script_dir/qemu"
 
+    # 初始化日志文件
+    init_log_file "$script_dir"
+
     # 如果未指定输出目录，使用脚本所在目录
     if [ -z "$output_dir" ]; then
         output_dir="$script_dir"
@@ -534,15 +602,19 @@ main() {
         output_dir="$(cd "$output_dir" && pwd)"
     fi
 
+    echo ""
     log_info "========================================"
     log_info "构建 openEuler Intelligence WSL 包"
     log_info "========================================"
-    log_info "工作目录: $script_dir"
-    log_info "QEMU 镜像目录: $qemu_dir"
     log_info "架构: $arch"
     log_info "变体: $variant"
-    log_info "输出目录: $output_dir"
     log_info ""
+
+    # 详细信息写入日志文件
+    log_detail "工作目录: $script_dir"
+    log_detail "QEMU 镜像目录: $qemu_dir"
+    log_detail "输出目录: $output_dir"
+    log_detail "当前用户: $(whoami) (UID: $(id -u))"
 
     # 检查依赖
     check_dependencies
@@ -609,19 +681,45 @@ main() {
     end_time=$(date +%s)
     duration=$((end_time - start_time))
 
-    log_info ""
+    # 格式化时间
+    local hours=$((duration / 3600))
+    local minutes=$(((duration % 3600) / 60))
+    local seconds=$((duration % 60))
+    local time_str=""
+    if [ $hours -gt 0 ]; then
+        time_str="${hours}h ${minutes}m ${seconds}s"
+    elif [ $minutes -gt 0 ]; then
+        time_str="${minutes}m ${seconds}s"
+    else
+        time_str="${seconds}s"
+    fi
+
+    echo ""
     log_info "========================================"
-    log_info "构建完成!"
+    log_info "✓ 构建完成!"
     log_info "========================================"
-    log_info "用时: ${duration}s"
-    log_info "输出文件: $output_wsl"
+    log_info "用时: $time_str"
+    log_info "输出文件: $(basename "$output_wsl")"
+    log_info "校验和: $(basename "${output_wsl}.sha256")"
+    log_info "日志文件: $(basename "$LOG_FILE")"
     log_info ""
     log_info "安装方法:"
-    log_info "  在 Windows 上运行:"
     log_info "  wsl --install --from-file $(basename "$output_wsl")"
+    log_info "  或者直接双击 .wsl 文件进行安装"
     log_info ""
-    log_info "或者直接双击 .wsl 文件进行安装"
-    log_info ""
+
+    # 将完成信息也写入日志
+    {
+        echo ""
+        echo "=========================================="
+        echo "构建完成"
+        echo "=========================================="
+        echo "结束时间: $(date '+%Y-%m-%d %H:%M:%S')"
+        echo "总用时: $time_str"
+        echo "输出文件: $output_wsl"
+        echo "校验和文件: ${output_wsl}.sha256"
+        echo ""
+    } >>"$LOG_FILE"
 }
 
 # 解析命令行参数
