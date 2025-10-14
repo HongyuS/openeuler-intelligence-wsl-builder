@@ -1,123 +1,181 @@
-# openEuler 虚拟机镜像 Tarball 生成工具
+# openEuler Intelligence - WSL 包构建工具
 
-这个脚本用于并行生成 openEuler 虚拟机镜像的 rootfs tarball 文件。
-
-## 环境要求
-
-- **系统**: Fedora Linux
-- **依赖**: libguestfs-tools
-
-### 安装依赖
-
-在 Fedora 上运行：
-
-```bash
-sudo dnf install libguestfs-tools
-```
-
-## 使用方法
-
-### 基本用法
-
-```bash
-# 给脚本添加执行权限
-chmod +x generate_tarballs.sh
-
-# 生成 x86_64 架构的 tarball（默认）
-./generate_tarballs.sh
-
-# 生成 aarch64 架构的 tarball
-./generate_tarballs.sh --arch aarch64
-
-# 指定输出目录
-./generate_tarballs.sh --output-dir /tmp/tarballs
-
-# 组合使用
-./generate_tarballs.sh --arch aarch64 --output-dir /tmp/tarballs
-```
-
-### 命令行选项
-
-| 选项 | 说明 | 默认值 |
-|------|------|--------|
-| `--arch ARCH` | 指定架构 (x86_64 或 aarch64) | x86_64 |
-| `--output-dir DIR` | 指定输出目录 | 脚本所在目录 |
-| `--help, -h` | 显示帮助信息 | - |
-
-## 目录结构
-
-脚本期望以下目录结构：
-
-```text
-.
-├── generate_tarballs.sh
-└── qemu/
-    ├── openEuler-intelligence-shell/
-    │   ├── openeuler-intelligence-oe2403sp2-aarch64.qcow2
-    │   ├── openeuler-intelligence-oe2403sp2-aarch64.xml
-    │   ├── openeuler-intelligence-oe2403sp2-x86_64.qcow2
-    │   └── openeuler-intelligence-oe2403sp2-x86_64.xml
-    └── openEuler-intelligence-web/
-        ├── openeuler-intelligence-oe2403sp2-aarch64.qcow2
-        ├── openeuler-intelligence-oe2403sp2-aarch64.xml
-        ├── openeuler-intelligence-oe2403sp2-x86_64.qcow2
-        └── openeuler-intelligence-oe2403sp2-x86_64.xml
-```
-
-## 输出文件
-
-脚本会生成以下文件：
-
-- `openEuler-intelligence-shell.rootfs.{arch}.tar`
-- `openEuler-intelligence-web.rootfs.{arch}.tar`
-
-其中 `{arch}` 为指定的架构（x86_64 或 aarch64）。
+从 QCOW2 虚拟机镜像构建 Windows Subsystem for Linux (WSL) 发行版包的完整工具集。
 
 ## 功能特性
 
-- ✅ **并行处理**: 同时提取两个虚拟机镜像，大幅缩短总体时间
-- ✅ **多架构支持**: 支持 x86_64 和 aarch64 架构
-- ✅ **灵活输出**: 可自定义输出目录
-- ✅ **完善的错误处理**: 详细的错误检查和日志输出
-- ✅ **彩色日志**: 使用颜色区分不同类型的消息
-- ✅ **进度追踪**: 显示每个任务的用时和生成文件大小
-- ✅ **校验和生成**: 自动生成 SHA256 校验和
-- ✅ **任务标签**: 清晰区分并行任务的输出
+- ✅ **自动提取**: 从 QCOW2 镜像自动提取文件系统
+- ✅ **智能过滤**: 自动排除不需要的系统目录
+- ✅ **WSL 优化**: 自动配置 WSL 相关文件和服务
+- ✅ **多架构支持**: x86_64 和 aarch64
+- ✅ **批量构建**: 一键构建所有变体
+- ✅ **完整验证**: 自动生成和验证 SHA256 校验和
 
-## 示例输出
+## 快速开始
 
-```text
-[INFO] 工作目录: /path/to/vm
-[INFO] QEMU 镜像目录: /path/to/vm/qemu
-[INFO] 目标架构: x86_64
-[INFO] 输出目录: /path/to/vm
-[INFO] 准备并行提取 2 个虚拟机镜像...
+### 环境要求
 
-[INFO] [SHELL] 开始提取: openeuler-intelligence-oe2403sp2-x86_64.qcow2
-[INFO] [WEB] 开始提取: openeuler-intelligence-oe2403sp2-x86_64.qcow2
-[INFO] [SHELL] 完成! 用时: 45s, 大小: 1.2G
-[INFO] [WEB] 完成! 用时: 48s, 大小: 1.5G
-[INFO] [SHELL] 任务成功完成
-[INFO] [WEB] 任务成功完成
+- **系统**: Fedora Linux (推荐) 或其他支持 libguestfs 的 Linux 发行版
+- **依赖**: libguestfs-tools
 
-[INFO] ==================== 总结 ====================
-[INFO] 总用时: 48s
-[INFO] ✅ 所有 tarball 生成成功!
+```bash
+# Fedora / RHEL / CentOS
+sudo dnf install libguestfs-tools
 
-[INFO] 输出文件:
-[INFO]   - /path/to/vm/openEuler-intelligence-shell.rootfs.x86_64.tar
-[INFO]   - /path/to/vm/openEuler-intelligence-web.rootfs.x86_64.tar
-
-[INFO] SHA256 校验和:
-a1b2c3d4... openEuler-intelligence-shell.rootfs.x86_64.tar
-e5f6g7h8... openEuler-intelligence-web.rootfs.x86_64.tar
+# Ubuntu / Debian
+sudo apt install libguestfs-tools
 ```
+
+### 构建 WSL 包
+
+```bash
+# 1. 设置脚本权限
+make setup
+
+# 2. 检查依赖
+make check-deps
+
+# 3. 构建 WSL 包
+make wsl-shell-x86_64        # 构建 Shell 变体 x86_64
+make wsl-all                 # 构建所有 WSL 包
+
+# 4. 验证构建的包
+make verify-wsl
+```
+
+## 使用 Makefile
+
+```bash
+# WSL 包构建
+make wsl-shell-x86_64       # Shell 变体 x86_64
+make wsl-shell-aarch64      # Shell 变体 aarch64
+make wsl-web-x86_64         # Web 变体 x86_64
+make wsl-web-aarch64        # Web 变体 aarch64
+make wsl-all                # 所有 WSL 包
+
+# 清理和验证
+make clean                  # 清理 WSL 包和临时文件
+make verify-wsl             # 验证 WSL 包
+
+# 辅助功能
+make setup                  # 设置脚本执行权限
+make check-deps             # 检查依赖
+make help                   # 显示帮助
+```
+
+## 使用脚本
+
+```bash
+# 构建单个 WSL 包
+./build_wsl_package.sh --variant shell --arch x86_64
+./build_wsl_package.sh --variant web --arch aarch64
+
+# 批量构建所有 WSL 包
+./build_all_wsl_packages.sh
+
+# 验证 WSL 包
+./verify_wsl_package.sh openEuler-Intelligence-Shell.x86_64.wsl
+```
+
+## 在 Windows 上安装
+
+### 方法 1: 命令行
+
+```powershell
+# 从文件安装
+wsl --install --from-file openEuler-Intelligence-Shell.x86_64.wsl
+
+# 验证安装
+wsl --list --verbose
+
+# 启动
+wsl -d openEuler-Intelligence-Shell
+```
+
+### 方法 2: 图形界面
+
+直接双击 `.wsl` 文件即可安装。
+
+## 输出文件
+
+构建完成后会生成：
+
+```plaintext
+openEuler-Intelligence-Shell.x86_64.wsl
+openEuler-Intelligence-Shell.x86_64.wsl.sha256
+openEuler-Intelligence-Shell.aarch64.wsl
+openEuler-Intelligence-Shell.aarch64.wsl.sha256
+openEuler-Intelligence-Web.x86_64.wsl
+openEuler-Intelligence-Web.x86_64.wsl.sha256
+openEuler-Intelligence-Web.aarch64.wsl
+openEuler-Intelligence-Web.aarch64.wsl.sha256
+```
+
+## 排除的目录
+
+WSL 包会自动排除以下不需要的目录：
+
+- `/sys` - 系统虚拟文件系统
+- `/run` - 运行时数据
+- `/proc` - 进程信息
+- `/lost+found` - 文件系统恢复目录
+- `/dev` - 设备文件
+- `/boot` - 启动文件
+- `/afs` - Andrew 文件系统
+- `/root/.cache` - Root 用户缓存
+- `/var/cache` - 系统缓存
+- `/var/log` - 日志文件
+
+## 项目结构
+
+```plaintext
+.
+├── README.md                      # 本文件
+├── Makefile                       # 快捷命令
+│
+├── build_wsl_package.sh           # WSL 包构建脚本（单个）
+├── build_all_wsl_packages.sh      # WSL 包批量构建脚本
+├── verify_wsl_package.sh          # WSL 包验证脚本
+├── setup.sh                       # 一键设置脚本执行权限
+│
+├── wsl/                           # WSL 配置文件目录
+│   ├── wsl.conf                   # WSL 运行时配置
+│   ├── wsl-distribution.conf      # WSL 发行版配置
+│   ├── oobe.sh                    # 首次运行体验脚本
+│   └── openEuler.ico              # openEuler 图标文件
+│
+└── qemu/                          # QCOW2 虚拟机镜像目录
+    ├── openEuler-intelligence-shell/
+    │   ├── .gitkeep
+    │   ├── openeuler-intelligence-oe2403sp2-aarch64.qcow2
+    │   └── openeuler-intelligence-oe2403sp2-x86_64.qcow2
+    └── openEuler-intelligence-web/
+        ├── .gitkeep
+        ├── openeuler-intelligence-oe2403sp2-aarch64.qcow2
+        └── openeuler-intelligence-oe2403sp2-x86_64.qcow2
+
+```
+
+## 配置说明
+
+### WSL 配置文件
+
+所有 WSL 配置文件都在 `wsl/` 目录中：
+
+- **wsl.conf**: WSL 运行时配置（systemd、自动挂载等）
+- **wsl-distribution.conf**: 发行版配置（OOBE、快捷方式等）
+- **oobe.sh**: 首次运行体验脚本（创建用户）
+- **openEuler.ico**: openEuler 图标文件（用于 WSL 快捷方式和终端）
+
+这些文件会在构建时自动复制到正确的位置（`/etc/` 和 `/usr/lib/wsl/`）。
+
+### 自定义配置
+
+编辑 `wsl/` 目录下的配置文件，然后重新构建即可应用更改。
 
 ## 故障排查
 
 ### 错误: virt-tar-out 未找到
-
-**解决方案**: 安装 libguestfs-tools
 
 ```bash
 sudo dnf install libguestfs-tools
@@ -125,17 +183,57 @@ sudo dnf install libguestfs-tools
 
 ### 错误: QCOW2 文件不存在
 
-**解决方案**: 确保 `qemu/` 目录存在且包含正确的 QCOW2 文件
+确保 `qemu/` 目录包含正确的 QCOW2 文件。
 
-### 错误: 不支持的架构
+### 构建失败
 
-**解决方案**: 只使用 `x86_64` 或 `aarch64` 作为 `--arch` 参数
+```bash
+# 查看详细日志
+./build_wsl_package.sh --variant shell --arch x86_64 2>&1 | tee build.log
 
-## 性能优化
+# 清理后重试
+make clean
+make wsl-shell-x86_64
+```
 
-- 脚本使用 Bash 后台进程实现并行处理
-- 相比串行执行，可节省约 50% 的时间
-- 对于大型镜像文件，建议在 I/O 性能较好的存储上运行
+### WSL 安装失败
+
+```powershell
+# 检查 WSL 版本（需要 2.4.4 或更高）
+wsl --version
+
+# 更新 WSL
+wsl --update
+```
+
+## 技术细节
+
+### 构建流程
+
+1. 从 QCOW2 镜像提取文件系统
+2. 排除不需要的系统目录
+3. 配置 WSL 相关文件（从 `wsl/` 复制到 `/etc/`）
+4. 优化 systemd 服务（禁用可能导致问题的服务）
+5. 打包为 tar.gz 格式
+6. 重命名为 .wsl 文件
+7. 生成 SHA256 校验和
+
+### 符合 Microsoft 规范
+
+完全遵循 [Microsoft WSL 官方文档](https://learn.microsoft.com/en-us/windows/wsl/build-custom-distro)：
+
+- ✅ 正确的 tar 创建方式 (`--numeric-owner --absolute-names`)
+- ✅ 使用 gzip 最佳压缩
+- ✅ 正确的配置文件位置和权限
+- ✅ 排除不应包含的文件
+- ✅ 禁用可能导致问题的 systemd 服务
+
+## 相关资源
+
+- [Microsoft WSL 文档](https://learn.microsoft.com/en-us/windows/wsl/)
+- [构建自定义 WSL 发行版](https://learn.microsoft.com/en-us/windows/wsl/build-custom-distro)
+- [WSL 配置文件](https://learn.microsoft.com/en-us/windows/wsl/wsl-config)
+- [libguestfs 文档](https://libguestfs.org/)
 
 ## 许可证
 

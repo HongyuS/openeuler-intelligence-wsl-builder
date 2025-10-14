@@ -1,0 +1,94 @@
+# ============================================
+# openEuler Intelligence WSL 包构建工具
+# ============================================
+
+# ==================== 镜像文件 ====================
+# QCOW2 虚拟机镜像文件（通常很大，不应提交到仓库）
+*.qcow2
+*.qcow2c
+
+# libvirt XML 配置文件
+*.xml
+
+# ==================== 构建产物 ====================
+# WSL 包
+*.wsl
+*.wsl.sha256
+
+# 旧的 tarball 输出（已移除，保留以防万一）
+*.tar
+*.tar.gz
+*.rootfs.*.tar
+
+# ==================== 临时文件 ====================
+# 构建过程中的临时目录
+wsl_temp_*/
+wsl_packages/
+
+# ==================== 缓存 ====================
+# 各种缓存目录
+.cache/
+__pycache__/
+*.pyc
+*.pyo
+
+# ==================== 系统文件 ====================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ==================== IDE / 编辑器 ====================
+# VSCode
+.vscode/
+*.code-workspace
+
+# JetBrains
+.idea/
+*.iml
+
+# Vim
+*.swp
+*.swo
+*.swn
+.*.sw?
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# ==================== 日志文件 ====================
+*.log
+build.log
+
+# ==================== 备份文件 ====================
+*.bak
+*.backup
+*.old
+*.orig
+
+# ==================== 保留的目录 ====================
+# 不要忽略 .gitkeep 文件
+!.gitkeep
+
+# 不要忽略 wsl 配置目录
+!wsl/
+!wsl/*
