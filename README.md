@@ -36,7 +36,7 @@
 ```bash
 # 示例：下载 x86_64 Shell 变体镜像
 cd qemu/openEuler-intelligence-shell/
-wget https://repo.oepkgs.net/openEuler/rpm/openEuler-24.03-LTS-SP2/contrib/eulercopilot/images/x86_64/qemu/openEuler-intelligence-web/openeuler-intelligence-oe2403sp2-x86_64.qcow2
+wget https://repo.oepkgs.net/openEuler/rpm/openEuler-24.03-LTS-SP2/contrib/eulercopilot/images/x86_64/qemu/openEuler-intelligence-shell/openeuler-intelligence-oe2403sp2-x86_64.qcow2
 
 # 示例：下载 aarch64 Shell 变体镜像
 wget https://repo.oepkgs.net/openEuler/rpm/openEuler-24.03-LTS-SP2/contrib/eulercopilot/images/aarch64/qemu/openEuler-intelligence-shell/openeuler-intelligence-oe2403sp2-aarch64.qcow2
