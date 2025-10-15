@@ -57,7 +57,11 @@ clean:
 clean-quick:
 	@echo "快速清理（仅清理临时文件和日志）..."
 	@./build_wsl_package.sh --clean || true
-	@sudo rm -rf wsl_temp*/ 2>/dev/null || rm -rf wsl_temp*/ 2>/dev/null || true
+	@if [ "$$(id -u)" -eq 0 ]; then \
+		rm -rf wsl_temp*/ 2>/dev/null || true; \
+	else \
+		sudo rm -rf wsl_temp*/ 2>/dev/null || rm -rf wsl_temp*/ 2>/dev/null || true; \
+	fi
 	@rm -rf wsl_packages/ 2>/dev/null || true
 	@rm -f build_wsl_*.log 2>/dev/null || true
 	@echo "✅ 快速清理完成（WSL 包文件已保留）"
@@ -65,7 +69,11 @@ clean-quick:
 clean-all:
 	@echo "完全清理（包括 WSL 包文件）..."
 	@./build_wsl_package.sh --clean || true
-	@sudo rm -rf wsl_temp*/ 2>/dev/null || rm -rf wsl_temp*/ 2>/dev/null || true
+	@if [ "$$(id -u)" -eq 0 ]; then \
+		rm -rf wsl_temp*/ 2>/dev/null || true; \
+	else \
+		sudo rm -rf wsl_temp*/ 2>/dev/null || rm -rf wsl_temp*/ 2>/dev/null || true; \
+	fi
 	@rm -rf wsl_packages/ 2>/dev/null || true
 	@rm -f build_wsl_*.log 2>/dev/null || true
 	@rm -f openEuler-Intelligence-*.wsl 2>/dev/null || true

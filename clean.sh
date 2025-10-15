@@ -3,8 +3,21 @@
 # 清理脚本 - 清理 WSL 构建过程中生成的所有文件和临时目录
 # 用于 openEuler Intelligence WSL 包构建项目
 #
+# 需要 root 权限来清理某些受保护的文件
+# 用法: ./clean.sh 或 sudo ./clean.sh
 
 set -e
+
+# 保存原始用户信息（在 sudo 之前）
+ORIGINAL_USER="${SUDO_USER:-$USER}"
+ORIGINAL_HOME="${SUDO_HOME:-$HOME}"
+
+# 检查是否以 root 权限运行，如果不是则使用 sudo 重新执行
+if [ "$EUID" -ne 0 ]; then
+    echo "此脚本需要 root 权限来清理临时文件"
+    echo "使用 sudo 重新执行脚本..."
+    exec sudo -E SUDO_HOME="$HOME" "$0" "$@"
+fi
 
 # 颜色定义
 RED='\033[0;31m'
@@ -41,7 +54,7 @@ if [ -n "$TEMP_DIRS" ]; then
         log_info "处理临时目录: $dir"
         
         # 检查是否有进程占用
-        PROCESSES=$(sudo lsof +D "$dir" 2>/dev/null | tail -n +2 | awk '{print $2}' | sort -u || true)
+        PROCESSES=$(lsof +D "$dir" 2>/dev/null | tail -n +2 | awk '{print $2}' | sort -u || true)
         
         if [ -n "$PROCESSES" ]; then
             log_warn "发现进程占用目录: $dir"
@@ -55,7 +68,7 @@ if [ -n "$TEMP_DIRS" ]; then
             echo
             if [[ $REPLY =~ ^[Yy]$ ]]; then
                 log_info "终止占用进程..."
-                sudo fuser -k "$dir" 2>/dev/null || true
+                fuser -k "$dir" 2>/dev/null || true
                 sleep 1
             else
                 log_warn "跳过目录: $dir"
@@ -66,10 +79,10 @@ if [ -n "$TEMP_DIRS" ]; then
         # 修改权限以确保可以删除
         if [ -d "$dir" ]; then
             log_info "修改目录权限..."
-            sudo chmod -R u+w "$dir" 2>/dev/null || true
+            chmod -R u+w "$dir" 2>/dev/null || true
             
             log_info "删除目录: $dir"
-            if sudo rm -rf "$dir"; then
+            if rm -rf "$dir"; then
                 log_info "✅ 已删除: $dir"
             else
                 log_error "❌ 删除失败: $dir"
@@ -150,12 +163,13 @@ else
 fi
 
 # 6. 清理可能的 libguestfs 缓存（可选）
-if [ -d "$HOME/.cache/libguestfs" ]; then
-    log_info "发现 libguestfs 缓存目录"
+LIBGUESTFS_CACHE="$ORIGINAL_HOME/.cache/libguestfs"
+if [ -d "$LIBGUESTFS_CACHE" ]; then
+    log_info "发现 libguestfs 缓存目录: $LIBGUESTFS_CACHE"
     read -p "是否清理 libguestfs 缓存? (y/N): " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        rm -rf "$HOME/.cache/libguestfs"
+        rm -rf "$LIBGUESTFS_CACHE"
         log_info "✅ libguestfs 缓存已清理"
     fi
 fi
