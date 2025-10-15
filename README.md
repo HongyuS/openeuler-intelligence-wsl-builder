@@ -19,6 +19,30 @@
 
 ## 快速开始
 
+### 获取 QCOW2 镜像
+
+在构建 WSL 包之前，您需要下载 openEuler Intelligence QCOW2 镜像文件：
+
+**x86_64 架构**:
+
+- 下载地址: <https://repo.oepkgs.net/openEuler/rpm/openEuler-24.03-LTS-SP2/contrib/eulercopilot/images/x86_64/qemu/>
+- 保存到: `qemu/openEuler-intelligence-shell/` 或 `qemu/openEuler-intelligence-web/`
+
+**aarch64 架构**:
+
+- 下载地址: <https://repo.oepkgs.net/openEuler/rpm/openEuler-24.03-LTS-SP2/contrib/eulercopilot/images/aarch64/qemu/>
+- 保存到: `qemu/openEuler-intelligence-shell/` 或 `qemu/openEuler-intelligence-web/`
+
+```bash
+# 示例：下载 x86_64 Shell 变体镜像
+cd qemu/openEuler-intelligence-shell/
+wget https://repo.oepkgs.net/openEuler/rpm/openEuler-24.03-LTS-SP2/contrib/eulercopilot/images/x86_64/qemu/openEuler-intelligence-web/openeuler-intelligence-oe2403sp2-x86_64.qcow2
+
+# 示例：下载 aarch64 Shell 变体镜像
+wget https://repo.oepkgs.net/openEuler/rpm/openEuler-24.03-LTS-SP2/contrib/eulercopilot/images/aarch64/qemu/openEuler-intelligence-shell/openeuler-intelligence-oe2403sp2-aarch64.qcow2
+cd ../..
+```
+
 ### 环境要求
 
 - **系统**: Fedora Linux (推荐) 或其他支持 libguestfs 的 Linux 发行版
@@ -336,4 +360,8 @@ wsl --update
 
 ## 许可证
 
-请根据项目需求添加适当的许可证信息。
+本项目采用 [木兰宽松许可证，第2版（Mulan PSL v2）](LICENSE)。
+
+Copyright (c) 2025 [openEuler Intelligence 贡献者](https://www.openeuler.org/zh/sig/sig-intelligence)
+
+您可以根据木兰宽松许可证第2版的条款自由使用本软件。详细信息请参阅 [LICENSE](LICENSE) 文件。
