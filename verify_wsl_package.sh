@@ -79,14 +79,16 @@ if [ -f "$CHECKSUM_FILE" ]; then
 
     if command -v sha256sum &>/dev/null; then
         # 使用 sha256sum 验证
-        verify_output=$(cd "$FILE_DIR" && sha256sum -c "$CHECKSUM_BASENAME" 2>&1)
-        if echo "$verify_output" | grep -q "OK"; then
+        # 设置 LC_ALL=C 确保输出是英文
+        verify_output=$(cd "$FILE_DIR" && LC_ALL=C sha256sum -c "$CHECKSUM_BASENAME" 2>&1)
+        # 检查退出状态码，0 表示成功
+        if cd "$FILE_DIR" && LC_ALL=C sha256sum -c "$CHECKSUM_BASENAME" >/dev/null 2>&1; then
             verify_result=0
         fi
     elif command -v shasum &>/dev/null; then
         # 使用 shasum 验证
-        verify_output=$(cd "$FILE_DIR" && shasum -a 256 -c "$CHECKSUM_BASENAME" 2>&1)
-        if echo "$verify_output" | grep -q "OK"; then
+        verify_output=$(cd "$FILE_DIR" && LC_ALL=C shasum -a 256 -c "$CHECKSUM_BASENAME" 2>&1)
+        if cd "$FILE_DIR" && LC_ALL=C shasum -a 256 -c "$CHECKSUM_BASENAME" >/dev/null 2>&1; then
             verify_result=0
         fi
     fi
