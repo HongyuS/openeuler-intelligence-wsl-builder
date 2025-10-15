@@ -80,28 +80,51 @@ else
     log_info "未找到临时目录"
 fi
 
-# 2. 清理 WSL 包文件
-log_info "清理 WSL 包文件..."
+# 2. 清理 WSL 包文件（可选）
+log_info "检查 WSL 包文件..."
 WSL_FILES=$(ls openEuler-Intelligence-*.wsl 2>/dev/null || true)
 if [ -n "$WSL_FILES" ]; then
+    log_warn "发现以下 WSL 包文件:"
     for file in $WSL_FILES; do
-        log_info "删除: $file"
-        rm -f "$file"
+        SIZE=$(du -h "$file" | cut -f1)
+        log_warn "  - $file ($SIZE)"
     done
-    log_info "✅ WSL 包文件已清理"
+    
+    read -p "是否删除这些 WSL 包文件? (y/N): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        for file in $WSL_FILES; do
+            log_info "删除: $file"
+            rm -f "$file"
+        done
+        log_info "✅ WSL 包文件已清理"
+    else
+        log_info "保留 WSL 包文件"
+    fi
 else
     log_info "未找到 WSL 包文件"
 fi
 
-# 3. 清理 SHA256 校验文件
-log_info "清理 SHA256 校验文件..."
+# 3. 清理 SHA256 校验文件（可选）
+log_info "检查 SHA256 校验文件..."
 SHA_FILES=$(ls openEuler-Intelligence-*.wsl.sha256 2>/dev/null || true)
 if [ -n "$SHA_FILES" ]; then
+    log_warn "发现以下 SHA256 校验文件:"
     for file in $SHA_FILES; do
-        log_info "删除: $file"
-        rm -f "$file"
+        log_warn "  - $file"
     done
-    log_info "✅ SHA256 文件已清理"
+    
+    read -p "是否删除这些 SHA256 校验文件? (y/N): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        for file in $SHA_FILES; do
+            log_info "删除: $file"
+            rm -f "$file"
+        done
+        log_info "✅ SHA256 文件已清理"
+    else
+        log_info "保留 SHA256 校验文件"
+    fi
 else
     log_info "未找到 SHA256 文件"
 fi

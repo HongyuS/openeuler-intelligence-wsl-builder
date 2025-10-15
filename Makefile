@@ -1,5 +1,5 @@
 .PHONY: help wsl-shell-x86_64 wsl-shell-aarch64 wsl-web-x86_64 wsl-web-aarch64
-.PHONY: wsl-all clean clean-quick verify-wsl check-deps setup
+.PHONY: wsl-all clean clean-quick clean-all verify-wsl check-deps setup
 
 help:
 	@echo "openEuler Intelligence - WSL 包构建工具"
@@ -12,8 +12,9 @@ help:
 	@echo "  make wsl-all            - 构建所有 WSL 包"
 	@echo ""
 	@echo "清理和验证:"
-	@echo "  make clean              - 完整清理（检查进程占用）"
-	@echo "  make clean-quick        - 快速清理（不检查进程占用）"
+	@echo "  make clean              - 交互式清理（检查进程占用，可选保留 WSL 包）"
+	@echo "  make clean-quick        - 快速清理（不检查进程，保留 WSL 包）"
+	@echo "  make clean-all          - 完全清理（不检查进程，删除所有文件）"
 	@echo "  make verify-wsl         - 验证 WSL 包"
 	@echo ""
 	@echo "其他:"
@@ -54,14 +55,22 @@ clean:
 	@./clean.sh
 
 clean-quick:
-	@echo "快速清理（不检查进程占用）..."
+	@echo "快速清理（仅清理临时文件和日志）..."
 	@./build_wsl_package.sh --clean || true
 	@sudo rm -rf wsl_temp*/ 2>/dev/null || rm -rf wsl_temp*/ 2>/dev/null || true
-	@rm -f openEuler-Intelligence-*.wsl 2>/dev/null || true
-	@rm -f openEuler-Intelligence-*.wsl.sha256 2>/dev/null || true
 	@rm -rf wsl_packages/ 2>/dev/null || true
 	@rm -f build_wsl_*.log 2>/dev/null || true
-	@echo "快速清理完成"
+	@echo "✅ 快速清理完成（WSL 包文件已保留）"
+
+clean-all:
+	@echo "完全清理（包括 WSL 包文件）..."
+	@./build_wsl_package.sh --clean || true
+	@sudo rm -rf wsl_temp*/ 2>/dev/null || rm -rf wsl_temp*/ 2>/dev/null || true
+	@rm -rf wsl_packages/ 2>/dev/null || true
+	@rm -f build_wsl_*.log 2>/dev/null || true
+	@rm -f openEuler-Intelligence-*.wsl 2>/dev/null || true
+	@rm -f openEuler-Intelligence-*.wsl.sha256 2>/dev/null || true
+	@echo "✅ 完全清理完成（所有文件已删除）"
 
 verify-wsl:
 	@echo "验证 WSL 包..."
