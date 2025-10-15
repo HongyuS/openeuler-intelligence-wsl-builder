@@ -14,6 +14,9 @@
 
 set -euo pipefail
 
+# 使用 direct backend 避免权限问题
+export LIBGUESTFS_BACKEND=direct
+
 # 检查是否以 root 权限运行，如果不是则使用 sudo 重新执行
 if [ "$EUID" -ne 0 ]; then
     echo "此脚本需要 root 权限来操作文件系统"
