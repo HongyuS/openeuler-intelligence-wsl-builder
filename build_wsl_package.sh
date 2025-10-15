@@ -512,13 +512,37 @@ create_wsl_tar() {
     log_step "创建 WSL tar 包..."
 
     log_info "打包文件系统 (这可能需要几分钟)..."
-    log_detail "执行命令: tar --numeric-owner --absolute-names -c * | gzip --best"
+    log_detail "执行命令: tar --numeric-owner --absolute-names -c ./* | gzip --best"
 
     # 使用推荐的方式创建 tar 文件
-    if ! (cd "$rootfs" && tar --numeric-owner --absolute-names -c * 2>&1 | tee -a "$LOG_FILE" | gzip --best >"$output_tar"); then
+    # 注意: tar 的标准输出是二进制数据流，不应写入日志文件
+    # 只将错误信息写入临时文件，然后追加到日志
+    local tar_stderr
+    tar_stderr=$(mktemp)
+
+    if ! (cd "$rootfs" && tar --numeric-owner --absolute-names -c ./* 2>"$tar_stderr" | gzip --best >"$output_tar"); then
         log_error "创建 tar 包失败"
+        if [ -s "$tar_stderr" ]; then
+            log_error "详细错误信息请查看日志文件"
+            [ -n "$LOG_FILE" ] && {
+                echo "[ERROR] tar 打包错误输出:" >>"$LOG_FILE"
+                cat "$tar_stderr" >>"$LOG_FILE"
+            }
+        fi
+        rm -f "$tar_stderr"
         return 1
     fi
+
+    # 如果有警告信息，记录到日志
+    if [ -s "$tar_stderr" ]; then
+        log_detail "tar 警告信息 (详见日志文件)"
+        [ -n "$LOG_FILE" ] && {
+            echo "[WARN] tar 打包警告:" >>"$LOG_FILE"
+            cat "$tar_stderr" >>"$LOG_FILE"
+        }
+    fi
+
+    rm -f "$tar_stderr"
 
     local size
     size=$(du -h "$output_tar" | cut -f1)
