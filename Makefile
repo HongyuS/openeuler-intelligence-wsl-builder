@@ -1,5 +1,5 @@
 .PHONY: help wsl-shell-x86_64 wsl-shell-aarch64 wsl-web-x86_64 wsl-web-aarch64
-.PHONY: wsl-all clean verify-wsl check-deps setup
+.PHONY: wsl-all clean clean-quick verify-wsl check-deps setup
 
 help:
 	@echo "openEuler Intelligence - WSL 包构建工具"
@@ -12,7 +12,8 @@ help:
 	@echo "  make wsl-all            - 构建所有 WSL 包"
 	@echo ""
 	@echo "清理和验证:"
-	@echo "  make clean              - 清理 WSL 包和临时文件"
+	@echo "  make clean              - 完整清理（检查进程占用）"
+	@echo "  make clean-quick        - 快速清理（不检查进程占用）"
 	@echo "  make verify-wsl         - 验证 WSL 包"
 	@echo ""
 	@echo "其他:"
@@ -50,13 +51,17 @@ wsl-all: check-deps
 
 clean:
 	@echo "清理 WSL 包和临时文件..."
+	@./clean.sh
+
+clean-quick:
+	@echo "快速清理（不检查进程占用）..."
 	@./build_wsl_package.sh --clean || true
-	@rm -vf openEuler-Intelligence-*.wsl
-	@rm -vf openEuler-Intelligence-*.wsl.sha256
-	@rm -rf wsl_packages/
-	@rm -rf wsl_temp*/
-	@rm -f build_wsl_*.log
-	@echo "清理完成"
+	@sudo rm -rf wsl_temp*/ 2>/dev/null || rm -rf wsl_temp*/ 2>/dev/null || true
+	@rm -f openEuler-Intelligence-*.wsl 2>/dev/null || true
+	@rm -f openEuler-Intelligence-*.wsl.sha256 2>/dev/null || true
+	@rm -rf wsl_packages/ 2>/dev/null || true
+	@rm -f build_wsl_*.log 2>/dev/null || true
+	@echo "快速清理完成"
 
 verify-wsl:
 	@echo "验证 WSL 包..."
@@ -64,5 +69,5 @@ verify-wsl:
 
 setup:
 	@echo "设置脚本执行权限..."
-	@chmod +x build_wsl_package.sh build_all_wsl_packages.sh verify_wsl_package.sh setup.sh wsl/oobe.sh
+	@chmod +x build_wsl_package.sh build_all_wsl_packages.sh verify_wsl_package.sh setup.sh clean.sh wsl/oobe.sh
 	@echo "✅ 所有脚本权限设置完成"

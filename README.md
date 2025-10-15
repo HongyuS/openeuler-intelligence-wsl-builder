@@ -57,7 +57,8 @@ make wsl-web-aarch64        # Web 变体 aarch64
 make wsl-all                # 所有 WSL 包
 
 # 清理和验证
-make clean                  # 清理 WSL 包和临时文件
+make clean                  # 完整清理（检查进程占用，交互式）
+make clean-quick            # 快速清理（不检查进程占用）
 make verify-wsl             # 验证 WSL 包
 
 # 辅助功能
@@ -176,6 +177,90 @@ WSL 包会自动排除以下不需要的目录：
 
 编辑 `wsl/` 目录下的配置文件，然后重新构建即可应用更改。
 
+## 清理功能
+
+项目提供了两种清理方式来满足不同需求：
+
+### 完整清理（推荐）
+
+```bash
+make clean
+# 或
+./clean.sh
+```
+
+**特性**：
+
+- ✅ 检测进程占用（lsof）
+- ✅ 交互式确认（避免误删）
+- ✅ 显示占用进程信息
+- ✅ 可选择终止进程或跳过
+- ✅ 清理 libguestfs 缓存（可选）
+- ✅ 显示清理后的磁盘使用情况
+
+**清理内容**：
+
+- `wsl_temp*/` - 所有临时目录
+- `*.wsl` - WSL 包文件
+- `*.wsl.sha256` - 校验和文件
+- `wsl_packages/` - 包目录
+- `build_wsl_*.log` - 构建日志
+- libguestfs 缓存（可选）
+
+### 快速清理
+
+```bash
+make clean-quick
+```
+
+**特性**：
+
+- ⚡ 快速执行
+- ⚡ 不检查进程占用
+- ⚡ 非交互式
+- ⚡ 适合自动化脚本
+
+**使用场景**：
+
+- CI/CD 自动化构建
+- 确定没有进程占用
+- 需要快速清理
+
+### 清理脚本功能
+
+`clean.sh` 脚本提供以下功能：
+
+1. **智能进程检测**: 自动检测占用临时目录的进程
+2. **友好提示**: 显示占用进程的 PID 和进程名
+3. **交互式选择**: 询问是否终止占用进程
+4. **权限修复**: 自动修复只读权限问题
+5. **安全删除**: 确保文件完全删除
+6. **统计报告**: 显示清理后的磁盘空间
+
+### 示例输出
+
+```bash
+$ make clean
+清理 WSL 包和临时文件...
+[INFO] 开始清理 WSL 构建文件...
+[INFO] 工作目录: /home/parallels/Dev/openEuler/euler-copilot/wsl-builder
+[INFO] 清理临时目录...
+[INFO] 处理临时目录: ./wsl_temp_shell_x86_64_6955
+[WARN] 发现进程占用目录: ./wsl_temp_shell_x86_64_6955
+[WARN]   进程 3525 (nautilus) 正在使用该目录
+是否强制终止这些进程并删除目录? (y/N): y
+[INFO] 终止占用进程...
+[INFO] 修改目录权限...
+[INFO] 删除目录: ./wsl_temp_shell_x86_64_6955
+[INFO] ✅ 已删除: ./wsl_temp_shell_x86_64_6955
+[INFO] 清理 WSL 包文件...
+[INFO] ✅ WSL 包文件已清理
+[INFO] ==========================================
+[INFO] 清理完成! 当前目录空间使用情况:
+[INFO] ==========================================
+[INFO] ✅ 所有清理操作已完成!
+```
+
 ## 故障排查
 
 ### 错误: virt-tar-out 未找到
@@ -198,6 +283,41 @@ sudo dnf install libguestfs-tools
 make clean
 make wsl-shell-x86_64
 ```
+
+### 权限错误（libguestfs）
+
+如果遇到类似 `permission denied` 或 `无法访问存储文件` 的错误：
+
+```bash
+# 方案1: 使用直接后端（推荐）
+export LIBGUESTFS_BACKEND=direct
+sudo -E make wsl-shell-x86_64
+
+# 方案2: 修改文件权限
+sudo chmod 644 qemu/openEuler-intelligence-*/*.qcow2
+sudo make wsl-shell-x86_64
+```
+
+### 无法删除临时目录
+
+如果 `make clean` 失败或临时目录无法删除：
+
+```bash
+# 使用完整清理（会检查并询问是否终止占用进程）
+make clean
+
+# 或使用快速清理（强制删除）
+make clean-quick
+
+# 手动清理特定目录
+sudo ./clean.sh
+```
+
+**常见原因**：
+
+- 文件管理器（nautilus/dolphin）打开了该目录
+- 某个进程正在访问临时文件
+- 目录包含只读文件
 
 ### WSL 安装失败
 
