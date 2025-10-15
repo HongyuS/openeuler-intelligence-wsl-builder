@@ -608,6 +608,9 @@ generate_checksum() {
     log_info "校验和生成完成 ✓"
 }
 
+# 全局变量用于 trap 清理
+TEMP_DIR=""
+
 # 主函数
 main() {
     local script_dir
@@ -616,7 +619,6 @@ main() {
     local output_dir
     local arch
     local variant
-    local temp_dir
     local output_name
     local output_tar
     local output_wsl
@@ -694,22 +696,22 @@ main() {
     fi
 
     # 创建临时目录
-    temp_dir="$script_dir/wsl_temp_${variant}_${arch}_$$"
-    mkdir -p "$temp_dir"
+    TEMP_DIR="$script_dir/wsl_temp_${variant}_${arch}_$$"
+    mkdir -p "$TEMP_DIR"
 
     # 设置清理陷阱
-    trap 'cleanup_temp "$temp_dir"' EXIT INT TERM
+    trap 'cleanup_temp "$TEMP_DIR"' EXIT INT TERM
 
     start_time=$(date +%s)
 
     # 提取文件系统
-    if ! extract_filesystem "$qcow2_path" "$temp_dir"; then
+    if ! extract_filesystem "$qcow2_path" "$TEMP_DIR"; then
         log_error "文件系统提取失败"
         exit 1
     fi
 
     # 配置 WSL 文件
-    if ! configure_wsl_files "$temp_dir" "$variant" "$script_dir"; then
+    if ! configure_wsl_files "$TEMP_DIR" "$variant" "$script_dir"; then
         log_error "WSL 配置失败"
         exit 1
     fi
@@ -720,7 +722,7 @@ main() {
     output_wsl="$output_dir/${output_name}.wsl"
 
     # 创建 WSL tar 包
-    if ! create_wsl_tar "$temp_dir" "$output_tar"; then
+    if ! create_wsl_tar "$TEMP_DIR" "$output_tar"; then
         log_error "创建 WSL tar 包失败"
         exit 1
     fi
