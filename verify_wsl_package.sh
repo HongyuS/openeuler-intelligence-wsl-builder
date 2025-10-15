@@ -71,11 +71,31 @@ if [ -f "$CHECKSUM_FILE" ]; then
 
     echo "   验证校验和..."
     FILE_DIR=$(dirname "$WSL_FILE")
+    CHECKSUM_BASENAME=$(basename "$CHECKSUM_FILE")
 
-    if (cd "$FILE_DIR" && sha256sum -c "$(basename "$CHECKSUM_FILE")" 2>&1 | grep -q "OK"); then
+    # 尝试验证校验和
+    verify_output=""
+    verify_result=1
+
+    if command -v sha256sum &>/dev/null; then
+        # 使用 sha256sum 验证
+        verify_output=$(cd "$FILE_DIR" && sha256sum -c "$CHECKSUM_BASENAME" 2>&1)
+        if echo "$verify_output" | grep -q "OK"; then
+            verify_result=0
+        fi
+    elif command -v shasum &>/dev/null; then
+        # 使用 shasum 验证
+        verify_output=$(cd "$FILE_DIR" && shasum -a 256 -c "$CHECKSUM_BASENAME" 2>&1)
+        if echo "$verify_output" | grep -q "OK"; then
+            verify_result=0
+        fi
+    fi
+
+    if [ $verify_result -eq 0 ]; then
         log_ok "校验和验证通过"
     else
         log_fail "校验和验证失败"
+        echo "   输出: $verify_output"
         FAILED=1
     fi
 else

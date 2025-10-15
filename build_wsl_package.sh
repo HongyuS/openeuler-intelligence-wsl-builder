@@ -576,7 +576,28 @@ generate_checksum() {
     dir=$(dirname "$wsl_file")
     filename=$(basename "$wsl_file")
 
-    (cd "$dir" && sha256sum "$filename" >"$(basename "$checksum_file")")
+    # 使用跨平台兼容的方式生成校验和
+    # 标准化输出格式为 GNU 格式：hash + 两个空格 + 文件名
+    local checksum
+    local hash
+    local fname
+
+    if command -v sha256sum &>/dev/null; then
+        # Linux/GNU 版本 (已经是两个空格)
+        checksum=$(cd "$dir" && sha256sum "$filename")
+    elif command -v shasum &>/dev/null; then
+        # macOS 版本 (使用 shasum -a 256，输出一个空格)
+        # 手动构造 GNU 格式：hash + 两个空格 + 文件名
+        hash=$(cd "$dir" && shasum -a 256 "$filename" | awk '{print $1}')
+        fname=$(basename "$filename")
+        checksum="${hash}  ${fname}"
+    else
+        log_error "未找到 sha256sum 或 shasum 命令"
+        return 1
+    fi
+
+    # 写入校验和文件
+    echo "$checksum" >"$checksum_file"
 
     # 将校验和写入日志文件
     if [ -n "$LOG_FILE" ]; then
