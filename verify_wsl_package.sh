@@ -135,7 +135,7 @@ if tar -tzf "$WSL_FILE" >"$TEMP_DIR/filelist.txt" 2>/dev/null; then
     echo ""
     echo "6. 检查排除的目录..."
 
-    EXCLUDED_DIRS=("sys/" "run/" "proc/" "dev/" "boot/" "lost+found/" "afs/")
+    EXCLUDED_DIRS=("sys/" "proc/" "dev/" "boot/" "lost+found/" "afs/")
     EXCLUDED_FOUND=0
 
     for dir in "${EXCLUDED_DIRS[@]}"; do
@@ -149,10 +149,22 @@ if tar -tzf "$WSL_FILE" >"$TEMP_DIR/filelist.txt" 2>/dev/null; then
     if [ $EXCLUDED_FOUND -eq 0 ]; then
         log_ok "已正确排除不需要的目录"
     fi
-
-    # 检查缓存和日志目录
+    
+    # 检查 run/ 目录（应该存在但为空）
     echo ""
-    echo "7. 检查缓存和日志目录..."
+    echo "7. 检查 /run 目录..."
+    if grep -q "^run/.\\+" "$TEMP_DIR/filelist.txt" || grep -q "^./run/.\\+" "$TEMP_DIR/filelist.txt"; then
+        log_fail "/run 目录应该为空"
+        FAILED=1
+    elif grep -q "^run/$" "$TEMP_DIR/filelist.txt" || grep -q "^./run/$" "$TEMP_DIR/filelist.txt"; then
+        log_ok "/run 目录存在且为空（正确）"
+    else
+        log_warn "/run 目录不存在（构建脚本应该会创建它）"
+    fi
+
+    # 检查缓存目录
+    echo ""
+    echo "8. 检查缓存目录..."
 
     if grep -q "^root/.cache/" "$TEMP_DIR/filelist.txt" || grep -q "^./root/.cache/" "$TEMP_DIR/filelist.txt"; then
         log_fail "不应该包含 /root/.cache"
@@ -168,16 +180,21 @@ if tar -tzf "$WSL_FILE" >"$TEMP_DIR/filelist.txt" 2>/dev/null; then
         log_ok "已排除 /var/cache"
     fi
 
-    if grep -q "^var/log/" "$TEMP_DIR/filelist.txt" || grep -q "^./var/log/" "$TEMP_DIR/filelist.txt"; then
-        log_fail "不应该包含 /var/log"
+    # 检查 /var/log 目录（应该存在但为空）
+    echo ""
+    echo "9. 检查 /var/log 目录..."
+    if grep -q "^var/log/.\\+" "$TEMP_DIR/filelist.txt" || grep -q "^./var/log/.\\+" "$TEMP_DIR/filelist.txt"; then
+        log_fail "/var/log 目录应该为空"
         FAILED=1
+    elif grep -q "^var/log/$" "$TEMP_DIR/filelist.txt" || grep -q "^./var/log/$" "$TEMP_DIR/filelist.txt"; then
+        log_ok "/var/log 目录存在且为空（正确）"
     else
-        log_ok "已排除 /var/log"
+        log_warn "/var/log 目录不存在（构建脚本应该会创建它）"
     fi
 
     # 检查不应该包含的文件
     echo ""
-    echo "8. 检查特殊文件..."
+    echo "10. 检查特殊文件..."
 
     if grep -q "^etc/resolv.conf$" "$TEMP_DIR/filelist.txt" || grep -q "^./etc/resolv.conf$" "$TEMP_DIR/filelist.txt"; then
         log_fail "不应该包含 /etc/resolv.conf (WSL 会自动生成)"
@@ -188,7 +205,7 @@ if tar -tzf "$WSL_FILE" >"$TEMP_DIR/filelist.txt" 2>/dev/null; then
 
     # 统计文件数量
     echo ""
-    echo "9. 包统计信息..."
+    echo "11. 包统计信息..."
     TOTAL_FILES=$(wc -l <"$TEMP_DIR/filelist.txt")
     FILE_SIZE=$(du -h "$WSL_FILE" | cut -f1)
 
