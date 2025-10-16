@@ -481,6 +481,7 @@ FSTABEOF
     fi
 
     # 禁用可能导致问题的 systemd 服务
+    # 参考: https://learn.microsoft.com/en-us/windows/wsl/build-custom-distro#systemd-recommendations
     if [ "$variant" = "shell" ] || [ "$variant" = "web" ]; then
         log_info "禁用不兼容的 systemd 服务..."
 
@@ -537,6 +538,27 @@ FSTABEOF
     # 确保 /run 目录存在（即使为空）
     mkdir -p "$rootfs/run"
     chmod 755 "$rootfs/run"
+
+    # 确保 /run/systemd 目录存在，这对 systemd 正常运行很重要
+    mkdir -p "$rootfs/run/systemd"
+    chmod 755 "$rootfs/run/systemd"
+
+    # 确保 /run/user 目录存在（用于用户级 systemd）
+    mkdir -p "$rootfs/run/user"
+    chmod 755 "$rootfs/run/user"
+
+    # 确保 /var/run 软链接正确指向 /run
+    if [ ! -L "$rootfs/var/run" ] || [ "$(readlink "$rootfs/var/run")" != "../run" ]; then
+        rm -rf "$rootfs/var/run"
+        ln -sf ../run "$rootfs/var/run"
+    fi
+
+    # 复制 systemd --user 修复脚本
+    if [ -f "$script_dir/wsl/fix-systemd-user.sh" ]; then
+        log_detail "复制 systemd --user 修复脚本"
+        cp "$script_dir/wsl/fix-systemd-user.sh" "$rootfs/usr/local/bin/fix-systemd-user"
+        chmod 755 "$rootfs/usr/local/bin/fix-systemd-user"
+    fi
 
     # 清理可能残留的机器 ID
     if [ -f "$rootfs/etc/machine-id" ]; then
