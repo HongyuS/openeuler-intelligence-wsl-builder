@@ -453,6 +453,24 @@ DISTEOF
         rm -f "$rootfs/etc/resolv.conf"
     fi
 
+    # 清理或重写 /etc/fstab (WSL 不需要虚拟机的挂载点)
+    if [ -f "$rootfs/etc/fstab" ]; then
+        log_detail "清理 /etc/fstab (移除虚拟机挂载点)"
+        # 备份原文件
+        cp "$rootfs/etc/fstab" "$rootfs/etc/fstab.bak"
+        # 创建一个空的 fstab 文件，只保留注释
+        cat >"$rootfs/etc/fstab" <<'FSTABEOF'
+#
+# /etc/fstab
+# WSL distribution - filesystem table
+#
+# WSL automatically manages most filesystems.
+# Only add entries here if you need specific custom mounts.
+#
+FSTABEOF
+        chmod 644 "$rootfs/etc/fstab"
+    fi
+
     # 清理密码哈希 (如果存在 /etc/shadow)
     if [ -f "$rootfs/etc/shadow" ]; then
         log_detail "清理密码哈希"
@@ -499,6 +517,41 @@ DISTEOF
 
         log_info "已禁用 $masked_count 个服务/挂载"
     fi
+
+    # 清理可能导致问题的日志和临时文件
+    log_info "清理日志和临时文件..."
+
+    # 确保 /var/log 目录存在但为空（构建时已排除，但需要重新创建）
+    mkdir -p "$rootfs/var/log"
+
+    # 确保 /tmp 目录存在且权限正确
+    if [ -d "$rootfs/tmp" ]; then
+        # 清空 tmp 目录
+        find "$rootfs/tmp" -mindepth 1 -delete 2>/dev/null || true
+        chmod 1777 "$rootfs/tmp"
+    else
+        mkdir -p "$rootfs/tmp"
+        chmod 1777 "$rootfs/tmp"
+    fi
+
+    # 确保 /run 目录存在（即使为空）
+    mkdir -p "$rootfs/run"
+    chmod 755 "$rootfs/run"
+
+    # 清理可能残留的机器 ID
+    if [ -f "$rootfs/etc/machine-id" ]; then
+        log_detail "清空 machine-id (WSL 会重新生成)"
+        : >"$rootfs/etc/machine-id"
+        chmod 444 "$rootfs/etc/machine-id"
+    fi
+
+    # 清理 systemd catalog (可能包含旧的机器特定信息)
+    if [ -d "$rootfs/var/lib/systemd/catalog" ]; then
+        log_detail "清理 systemd catalog"
+        rm -rf "$rootfs/var/lib/systemd/catalog"/* 2>/dev/null || true
+    fi
+
+    log_info "清理完成 ✓"
 
     log_info "WSL 配置完成 ✓"
 }
